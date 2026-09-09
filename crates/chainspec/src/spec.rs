@@ -3,6 +3,9 @@ use alloy_evm::eth::spec::EthExecutorSpec;
 
 use crate::{
     constants::{MAINNET_DEPOSIT_CONTRACT, MAINNET_PRUNE_DELETE_LIMIT},
+    ephemery::{
+        current_ephemery_period, ephemery_blob_params, ephemery_genesis, ephemery_hardforks,
+    },
     ethereum::SEPOLIA_PARIS_TTD,
     holesky, hoodi, mainnet,
     mainnet::{MAINNET_PARIS_BLOCK, MAINNET_PARIS_TTD},
@@ -239,6 +242,32 @@ pub static HOODI: LazyLock<Arc<ChainSpec>> = LazyLock::new(|| {
     spec.into()
 });
 
+/// The Ephemery spec
+pub static EPHEMERY: LazyLock<Arc<ChainSpec>> = LazyLock::new(|| {
+    let genesis = ephemery_genesis(
+        serde_json::from_str(include_str!("../res/genesis/ephemery.json"))
+            .expect("Can't deserialize Ephemery genesis json"),
+    );
+    let (_, chain_id, genesis_timestamp) = current_ephemery_period();
+    let hardforks = ephemery_hardforks(genesis_timestamp);
+    let spec = ChainSpec {
+        chain: Chain::from_id(chain_id),
+        genesis_header: SealedHeader::seal_slow(make_genesis_header(&genesis, &hardforks)),
+        genesis,
+        paris_block_and_final_difficulty: Some((0, U256::from(1))),
+        hardforks,
+        deposit_contract: Some(DepositContract::new(
+            address!("0x00000000219ab540356cBB839Cbe05303d7705Fa"),
+            0,
+            b256!("0x649bbc62d0e31342afea4e5cd82d4049e7e1ee912fc0889aa790803be39038c5"),
+        )),
+        base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
+        prune_delete_limit: 10000,
+        blob_params: ephemery_blob_params(genesis_timestamp),
+    };
+    spec.into()
+});
+
 /// Dev testnet specification
 ///
 /// Includes 20 prefunded accounts with `10_000` ETH each derived from mnemonic "test test test test
@@ -352,8 +381,8 @@ pub fn blob_params_to_schedule(
     let bpo_forks = EthereumHardfork::bpo_variants();
     for (timestamp, blob_params) in &params.scheduled {
         for bpo_fork in bpo_forks {
-            if let ForkCondition::Timestamp(fork_ts) = hardforks.fork(bpo_fork) &&
-                fork_ts == *timestamp
+            if let ForkCondition::Timestamp(fork_ts) = hardforks.fork(bpo_fork)
+                && fork_ts == *timestamp
             {
                 schedule.insert(bpo_fork.name().to_lowercase(), *blob_params);
                 break;
@@ -545,7 +574,7 @@ impl<H: BlockHeader> ChainSpec<H> {
                 // given timestamp.
                 for (fork, params) in bf_params.iter().rev() {
                     if self.hardforks.is_fork_active_at_timestamp(fork.clone(), timestamp) {
-                        return *params
+                        return *params;
                     }
                 }
 
@@ -638,8 +667,8 @@ impl<H: BlockHeader> ChainSpec<H> {
             // We filter out TTD-based forks w/o a pre-known block since those do not show up in
             // the fork filter.
             Some(match condition {
-                ForkCondition::Block(block) |
-                ForkCondition::TTD { fork_block: Some(block), .. } => ForkFilterKey::Block(block),
+                ForkCondition::Block(block)
+                | ForkCondition::TTD { fork_block: Some(block), .. } => ForkFilterKey::Block(block),
                 ForkCondition::Timestamp(time) => ForkFilterKey::Time(time),
                 _ => return None,
             })
@@ -673,8 +702,8 @@ impl<H: BlockHeader> ChainSpec<H> {
         for (_, cond) in self.hardforks.forks_iter() {
             // handle block based forks and the sepolia merge netsplit block edge case (TTD
             // ForkCondition with Some(block))
-            if let ForkCondition::Block(block) |
-            ForkCondition::TTD { fork_block: Some(block), .. } = cond
+            if let ForkCondition::Block(block)
+            | ForkCondition::TTD { fork_block: Some(block), .. } = cond
             {
                 if head.number >= block {
                     // skip duplicated hardforks: hardforks enabled at genesis block
@@ -685,7 +714,7 @@ impl<H: BlockHeader> ChainSpec<H> {
                 } else {
                     // we can return here because this block fork is not active, so we set the
                     // `next` value
-                    return ForkId { hash: forkhash, next: block }
+                    return ForkId { hash: forkhash, next: block };
                 }
             }
         }
@@ -707,7 +736,7 @@ impl<H: BlockHeader> ChainSpec<H> {
                 // can safely return here because we have already handled all block forks and
                 // have handled all active timestamp forks, and set the next value to the
                 // timestamp that is known but not active yet
-                return ForkId { hash: forkhash, next: timestamp }
+                return ForkId { hash: forkhash, next: timestamp };
             }
         }
 
