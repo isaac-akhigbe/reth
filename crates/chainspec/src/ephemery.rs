@@ -19,6 +19,9 @@ pub(crate) const PERIOD_IN_SECONDS: u64 = 28 * 24 * 60 * 60;
 /// Base chain ID for Ephemery (iteration 0's chain ID)
 pub(crate) const EPHEMERY_BASE_CHAIN_ID: u64 = 39438000;
 
+/// Upper bound on Ephemery iteration count (approx. 767 years)
+pub(crate) const EPHEMERY_ITERATION_UPPER_BOUND: u64 = 10_000;
+
 /// BPO1 activation offset from genesis timestamp
 pub(crate) const BPO1_OFFSET: u64 = 787032;
 
@@ -49,6 +52,12 @@ pub(crate) fn ephemery_genesis(mut genesis: Genesis) -> Genesis {
     let (_, _, genesis_timestamp) = current_ephemery_period();
     genesis.timestamp = genesis_timestamp;
     genesis
+}
+
+/// Checks whether a chain ID falls within the Ephemery range, because each iteration increments the chain ID by one from the base.
+pub(crate) fn is_ephemery_chain_id(chain_id: u64) -> bool {
+    chain_id >= EPHEMERY_BASE_CHAIN_ID
+        && chain_id < EPHEMERY_BASE_CHAIN_ID + EPHEMERY_ITERATION_UPPER_BOUND
 }
 
 /// Builds the hardfork schedule for Ephemery.

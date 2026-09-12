@@ -5,6 +5,7 @@ use crate::{
     constants::{MAINNET_DEPOSIT_CONTRACT, MAINNET_PRUNE_DELETE_LIMIT},
     ephemery::{
         current_ephemery_period, ephemery_blob_params, ephemery_genesis, ephemery_hardforks,
+        is_ephemery_chain_id,
     },
     ethereum::SEPOLIA_PARIS_TTD,
     holesky, hoodi, mainnet,
@@ -42,7 +43,9 @@ use reth_ethereum_forks::{
     ChainHardforks, DisplayHardforks, EthereumHardfork, EthereumHardforks, ForkCondition,
     ForkFilter, ForkFilterKey, ForkHash, ForkId, Hardfork, Hardforks, Head, DEV_HARDFORKS,
 };
-use reth_network_peers::{holesky_nodes, hoodi_nodes, mainnet_nodes, sepolia_nodes, NodeRecord};
+use reth_network_peers::{
+    ephemery_nodes, holesky_nodes, hoodi_nodes, mainnet_nodes, sepolia_nodes, NodeRecord,
+};
 use reth_primitives_traits::{sync::LazyLock, BlockHeader, SealedHeader};
 
 /// Helper method building a [`Header`] given [`Genesis`] and [`ChainHardforks`].
@@ -811,6 +814,11 @@ impl<H: BlockHeader> ChainSpec<H> {
     /// Returns the known bootnode records for the given chain.
     pub fn bootnodes(&self) -> Option<Vec<NodeRecord>> {
         use NamedChain as C;
+
+        // Ephemery uses a dynamic chain ID that won't match any NamedChain, so it's checked separately before the match.
+        if is_ephemery_chain_id(self.chain.id()) {
+            return Some(ephemery_nodes());
+        }
 
         match self.chain.try_into().ok()? {
             C::Mainnet => Some(mainnet_nodes()),
