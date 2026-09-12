@@ -88,7 +88,13 @@ pub(crate) fn ephemery_hardforks(genesis_timestamp: u64) -> ChainHardforks {
 
 /// Builds the blob params schedule for Ephemery.
 pub(crate) fn ephemery_blob_params(genesis_timestamp: u64) -> BlobScheduleBlobParams {
-    BlobScheduleBlobParams::default().with_scheduled([
+    BlobScheduleBlobParams {
+        cancun: BlobParams::cancun(),
+        prague: BlobParams::prague(),
+        osaka: BlobParams::osaka(),
+        ..Default::default()
+    }
+    .with_scheduled([
         (
             genesis_timestamp + BPO1_OFFSET,
             BlobParams {
